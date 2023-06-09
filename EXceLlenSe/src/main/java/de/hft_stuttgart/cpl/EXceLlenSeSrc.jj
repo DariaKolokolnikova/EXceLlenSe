@@ -1,0 +1,170 @@
+options
+{
+    IGNORE_CASE = true;
+    STATIC = false;
+}
+
+PARSER_BEGIN(EXceLlenSe)
+package de.hft_stuttgart.cpl;
+
+import java.util.*;
+
+public class EXceLlenSe {
+    public static void main(String args[]) throws ParseException {
+        EXceLlenSe parser = new EXceLlenSe(System.in);
+        while (true) {
+            parser.parseOneLine();
+        }
+    }
+}
+
+PARSER_END(EXceLlenSe)
+
+SKIP:
+{
+    " "
+|   "\r"
+|   "\t"
+}
+
+TOKEN:
+{
+    <NUMBER: (<DIGIT>)+ ( "." (<DIGIT>)+ )? >
+|   <DIGIT: ["0"-"9"] >
+|   <EOL: "\n" >
+|   <ADD: "+" >
+|   <SUB: "-" >
+|   <MUL: "*" >
+|   <DIV: "/" >
+|   <MOD: "%" >
+|   <STRING: "'" (~["'"])* "'" >
+|   <CELL_REFERENCE: <LETTER> <DIGIT> <LETTER> <DIGIT> >
+|   <LETTER: ["A"-"Z", "a"-"z"] >
+|   <ASSIGN: "=" >
+|   <CONCAT: "&" >
+|   <FORMAT: "FORMATTED" (<STRING>)*>
+}
+
+
+void parseOneLine():
+{
+    Object a;
+}
+{
+    (
+        (
+            a = assignment()
+            { System.out.println(); System.out.println(a); }
+        )
+        | (
+            a = expr()
+            { System.out.println(); System.out.println(a); }
+        )
+    )
+    <EOL>
+    | <EOF> { throw new ParseException("End Of Input"); }
+}
+
+Object assignment():
+{
+    Token cellRef;
+    Object value;
+}
+{
+    cellRef = <CELL_REFERENCE> <ASSIGN> value = expr() {
+        System.out.printf("Assigned %s = %s\n", cellRef.image, value);
+    }
+    { return value; }
+    { return null; }
+}
+
+Object expr():
+{
+    Object a;
+    Object b;
+}
+{
+    a = term() (
+        <ADD> b = term() {
+            System.out.print("+ ");
+            if (a instanceof Double && b instanceof Double) {
+                a = (double)a + (double)b;
+            }
+            else if (a instanceof String && b instanceof String) {
+                a = (String)a + (String)b;
+            }
+        }
+        |   <SUB> b = term() {
+            if (a instanceof Double && b instanceof Double) {
+                a = (double)a - (double)b;
+            }
+        }
+
+        |   <CONCAT> b = term() {
+            if (a instanceof String && b instanceof String) {
+                a = (String)a + (String)b;
+            }
+        }
+        |   <FORMAT> b = term() {
+                   // if (a instanceof Double && b instanceof Double) {
+                     //   a = (double)a - (double)b;
+                   // }
+                   a=String.format((String) b, a);
+                }
+    )*
+    { return a; }
+}
+
+Object term():
+{
+    Object a;
+    Object b;
+}
+{
+    a = factor() (
+        <MUL> b = factor() {
+            System.out.print("* ");
+            if (a instanceof Double && b instanceof Double) {
+                a = (double)a * (double)b;
+            }
+        }
+        |   <DIV> b = factor() {
+            if (a instanceof Double && b instanceof Double) {
+                a = (double)a / (double)b;
+            }
+        }
+        |   <MOD> b = factor() {
+            if (a instanceof Double && b instanceof Double) {
+                a = (double)a % (double)b;
+            }
+        }
+    )*
+    { return a; }
+}
+
+Object factor() throws ParseException:
+{
+    Token t;
+    Object a;
+}
+{
+    t = <NUMBER> {
+        System.out.printf("%s ", t.image);
+        return Double.parseDouble(t.image);
+    }
+    | <ADD> t = <NUMBER> {
+        System.out.printf("+ %s ", t.image);
+        return Double.parseDouble(t.image);
+    }
+    | <SUB> t = <NUMBER> {
+        System.out.printf("- %s ", t.image);
+        return -Double.parseDouble(t.image);
+    }
+    | t = <STRING> {
+        System.out.printf("%s ", t.image);
+        return t.image.substring(1, t.image.length() - 1); // Return the string without the enclosing quotes
+    }
+    | "(" a = expr() ")" {
+        return a;
+    }
+}
